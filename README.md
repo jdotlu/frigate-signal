@@ -5,6 +5,52 @@ This is my setup that includes running Frigate NVR through a Google Coral TPU. I
 
 1. Checkout this git repo
 
+2. Create your Frigate config in `./frigate/conf/conf.yml`. Mine looks something like this:
+    ```
+    detectors: # <---- add detectors
+      coral:
+        type: edgetpu
+        device: usb
+
+    cameras:
+      front: # <------ Name the camera
+        enabled: True
+        ffmpeg:
+          inputs:
+            - path: rtsp://blah@1.1.1.1/live0 # <----- The stream you want to use for detection
+              roles:
+                - detect
+                - record
+          hwaccel_args: preset-vaapi
+        detect:
+          enabled: True # <---- disable detection until you have a working camera feed
+        record: # <----- Enable recording
+          enabled: True
+          retain:
+            mode: all
+          events:
+            retain:
+              mode: active_objects
+        snapshots:
+          enabled: True
+          crop: True
+
+    objects:
+      filters:
+        person:
+          min_area: 2500
+
+    timestamp_style:
+      format: "%m/%d/%Y %H:%M:%S%Z"
+      effect: "shadow"
+
+    mqtt:
+      enabled: True
+      host: mqtt
+      topic_prefix: frigate
+      client_id: frigate
+    ```
+
 2. Build send_message Docker image
     ```
    cd send_message
