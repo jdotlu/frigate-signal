@@ -20,20 +20,27 @@ def on_connect(client, userdata, flags, reason_code, properties):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
     event = json.loads(msg.payload)
+    event_after = event["after"]
     
-    if event["type"] == "end":
-        camera_name = event["after"]["camera"]
-        event_id = event["after"]["id"]
-        event_time = str(datetime.datetime.fromtimestamp(event["after"]["end_time"]))
+    if event["type"] == "end" and event_after["has_clip"] and not event_after["false_positive"]:
+        camera_name = event_after["camera"]
+        event_id = event_after["id"]
+        event_time = str(datetime.datetime.fromtimestamp(event_after["end_time"]))
 
         now = str(datetime.datetime.now())
         print(f"{now} Received {camera_name} event {event_id}")
 
-        thumbnail = requests.get(f"http://frigate:5000/api/events/{event_id}/thumbnail.jpg").content
-        thumbnail64 = base64.b64encode(thumbnail).decode("ascii")
+        thumbnail_response = requests.get(f"http://frigate:5000/api/events/{event_id}/thumbnail.jpg")
+        
+        if (thumbnail_response.status_code == 200):
+            thumbnail = thumbnail_response.content
+            thumbnail64 = base64.b64encode(thumbnail).decode("ascii")
 
-        signal_request_body = {"message": f"{camera_name} {event_time}UTC", "base64_attachments": [thumbnail64], "number": signal_number, "recipients": [signal_recipient]}
-        signal_response = requests.post("http://signalapi:8080/v2/send", json = signal_request_body)
+            signal_request_body = {"message": f"{camera_name}\n{event_time}UTC", "base64_attachments": [thumbnail64], "number": signal_number, "recipients": [signal_recipient]}
+            signal_response = requests.post("http://signalapi:8080/v2/send", json = signal_request_body)
+        else:
+            event_string = str(event)
+            print(f"Could not get thumbnail. Event = {event_string}")
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 mqttc.on_connect = on_connect
